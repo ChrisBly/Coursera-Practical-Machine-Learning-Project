@@ -1,0 +1,203 @@
+---
+title: "Coursera Practical Machine Learning Project"
+author: "Chris Blycha"
+date: "16/01/2018"
+output:  
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#1: Background
+#### Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your oal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting aExercise Dataset).
+
+# 2: Project Description & Dataset Overview
+
+#Project Description
+#### The goal of the project is to predict the manner in which they did the exercise. This is the “classe” variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+#### our submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders.
+
+####You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.
+
+### Dataset Overview
+##### The training data for this project are available here:
+
+##### https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+##### The test data are available here:
+
+##### https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###### The data for this project come from http://groupware.les.inf.puc-rio.br/har.
+
+# 3: Environment Preparation , Loading Required Packages & Data loading
+```{r}
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(mboost)
+library(Amelia)
+library(DT)
+library(markdown)
+```
+#### Creating folder structure to download files:
+```{r}
+if(!file.exists("./data")){dir.create("./data")}
+```
+####Downloading files & removing any #DIV/0 entries
+```{r}
+Training_data <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+                          na.strings=c('#DIV/0', '', 'NA') ,stringsAsFactors = F)
+Testing_data  <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                          na.strings= c('#DIV/0', '', 'NA'),stringsAsFactors = F)
+```
+#### Keeping the original downloaded files & creating copies:
+```{r}
+Train_data <- Training_data
+Test_data <- Testing_data
+```
+# 4: Exploratory Analysis
+
+#### check missing values
+```{r}
+missmap(Train_data, main = "Missing values Map - Train_data")
+missmap(Test_data , main = "Missing values Map - Test_data ")
+```
+####We can see there is allot of missing data with in this data set. 
+####Checking the total NA values in the training data set.
+```{r}
+print(sum(is.na(Train_data))) # Checking for NA Values. 
+```
+#### There is 1921600 NA values in the data set.
+#### -Checking for zero variance predictors
+```{r}
+x = nearZeroVar(Train_data, saveMetrics = TRUE)
+str(x, vec.len=1)
+```
+####For this project we shall remove the zero variance predictors.
+# 5: Split the dataset & Cleaning data.
+###Split the dataset
+```{r}
+inTrain  <- createDataPartition(Train_data$classe, p=0.7, list=FALSE)
+TrainSet <- Training_data[inTrain, ]
+TestSet  <- Training_data[-inTrain,]
+dim(TrainSet)
+dim(TestSet)
+```
+####Cleaning data
+#### remove variables with Nearly Zero Variance
+```{r}
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NZV]
+TestSet  <- TestSet[, -NZV]
+dim(TrainSet)
+dim(TestSet)
+
+```
+#### remove variables that are mostly NA
+```{r}
+RNA <- (colSums(is.na(TrainSet)) == 0)
+TrainSet <- TrainSet[, RNA]
+TestSet<- TestSet[, RNA]
+rm(RNA)
+dim(TrainSet)
+dim(TestSet)
+```
+#### remove identification only variables (columns 1 to 5)
+```{r}
+TrainSet <- TrainSet[, -(1:5)]
+TestSet  <- TestSet[, -(1:5)]
+dim(TrainSet)
+dim(TestSet)
+```
+#6:  Model building
+
+###In this section, our plan is to build Decision Tree, Random forest, Generalized Boosted Model(Boosting) and then #choose with model has the best the out-of-sample accuracy. Then use this model to predict the manner in which they #did the exercise
+
+###Decision Tree
+####Using ML algorithms for prediction: Decision Tree
+```{r}
+set.seed(12345)
+modFitDecTree <- rpart(classe ~ ., data=TrainSet, method="class")
+```
+####Note: to view the decision tree with this command:
+```{r}
+prp(modFitDecTree, extra=6, box.palette="auto")
+```
+
+###Now, we estimate the performance of the model on the testing data set.
+```{r}
+predictTree <- predict(modFitDecTree, TestSet, type = "class")
+Model_1 <- confusionMatrix(TestSet$classe, predictTree)
+```
+####We can see the Accuracy : 0.74%.  Lets see Accuracy of the other ML models.
+#Random Forest
+####Now, we run a random forest algorithm with in is the caret package & use cross validation to select the number ####of the predictors. Here we use five fold cross validation in this model due the computational cost.
+```{r}
+modelRF <- train(classe ~ ., data = TrainSet, method = "rf", trControl = trainControl(method = "cv", 5), ntree = 250)
+modelRF
+```
+####Now, we estimate the performance of the model on the testing data set.
+```{r}
+predictRF <- predict(modelRF, TestSet)
+ModelRF_2 <-confusionMatrix(TestSet$classe, predictRF)
+ModelRF_2
+```
+
+####We can see the Accuracy is over 0.99%. The Accuracy has increased, the Lets see Accuracy of the other ML ####models.
+
+#Method: Generalized Boosted Model(Boosting)
+
+###In the boosting tree model, we first use five fold cross-validation
+
+```{r}
+set.seed(12345)
+Mod_3 <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+GModel_3  <- train(classe ~ ., data=TrainSet, method = "gbm",
+                    trControl = Mod_3 , verbose = FALSE)
+```
+####Now, we estimate the performance of the model on the testing data set.
+#### out-of-sample errors using testing dataset 
+```{r}
+PGModel_3 <- predict(GModel_3, newdata=TestSet)
+CGModel_3 <- confusionMatrix(PGModel_3, TestSet$classe)
+```
+```{r}
+CGModel_3
+```
+#Prediction Model Selection
+
+```{r}
+AccuracyResults <- data.frame(
+  Model = c('Decision Tree', 'Random Forest', 'GBM(Boosting)'),
+  Accuracy = rbind(Model_1$overall[1], ModelRF_2$overall[1], CGModel_3$overall[1])
+)
+AccuracyResults 
+```
+#### Based on an assessment of these 3 model fits and out-of-sample results, it looks like both random forests and GBM(Boosting) were better fit than the Decision Tree, with random forests being slightly more accurate. Therefore
+####we will use random forests to predict the manner in which they did the exercise
+
+#Preduction
+####As a last step in the project, I’ll use the testing data sample to predict a classe for each of the 20 # observations based on the other information we know about these observations contained in the validation sample.
+
+```{r}
+predict(modelRF, Test_data)
+```
+
+library("knitr")
+library("markdown")
+markdownToHTML('Coursera_Practical_ML.md', 'Coursera_Practical_ML') # creates html file
+
+
+
+
+
+
+
+
+
