@@ -409,7 +409,7 @@ ose_2
 ## [1] 0.003228547
 ```
 
-####We can see the Accuracy is over 0.99% & the estimated out-of-sample error is 0.001869159.  The Accuracy has increased, the Lets see Accuracy of the other ML models.
+####We can see the Accuracy is over 0.99% & the estimated out-of-sample error is 0.003228547.  The Accuracy has increased, the Lets see Accuracy of the other ML models.
 
 #Method: Generalized Boosted Model(Boosting)
 
@@ -503,7 +503,7 @@ ose_3
 ```
 ## [1] 0.01376381
 ```
-####We can see the Accuracy is over 0.99% & the estimated out-of-sample error is 0.0003398471. 
+####We can see the Accuracy is over 0.99% & the estimated out-of-sample error is 0.01376381. 
 
 #Prediction Model Selection
 
